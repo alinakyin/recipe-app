@@ -76,4 +76,14 @@ CREATE TABLE Rating
     FOREIGN KEY (recipe_id) REFERENCES Recipe (recipe_id) ON DELETE CASCADE
 );
 
+CREATE TABLE Save
+(
+    user_id    INT       NOT NULL,
+    recipe_id  INT       NOT NULL,
+    saved_date DATETIME  NOT NULL,
+    PRIMARY KEY (user_id, recipe_id),
+    FOREIGN KEY (user_id) REFERENCES User (user_id),
+    FOREIGN KEY (recipe_id) REFERENCES Recipe (recipe_id) ON DELETE CASCADE
+);
+
 

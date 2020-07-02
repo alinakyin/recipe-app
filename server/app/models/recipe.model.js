@@ -1,21 +1,25 @@
 const db = require('../../config/db');
 
 //View recipes
-exports.getRecipes = async function(q, categoryId, sortBy) {
+exports.getRecipes = async function(q, categoryId, authorId, sortBy) {
     try {
         const connection = await db.getPool().getConnection();
 
         var sql = "SELECT Recipe.recipe_id AS recipeId, title, description, yield, ready_in AS readyIn, Category.name AS category, " +
             "User.name AS authorName, avg(value) AS averageRating " +
             "FROM Recipe, Category, User, Rating " +
-            "WHERE Recipe.category_id = Category.category_id AND Recipe.author_id = User.user_id AND Recipe.recipe_id = Rating.recipe_id ";
+            "WHERE Recipe.category_id = Category.category_id AND Recipe.author_id = User.user_id AND Recipe.recipe_id = Rating.recipe_id";
 
         if (q != null) {
             sql += " AND title LIKE '%" + q + "%'";
         }
 
-        if (categoryId != null) {
+        if (categoryId != null ) {
             sql += " AND Recipe.category_id = " + categoryId;
+        }
+
+        if (authorId != null) {
+            sql += " AND Recipe.author_id = " + authorId;
         }
 
         sql += " GROUP BY recipeId";
@@ -56,7 +60,7 @@ exports.getCategories = async function(){
 
 
 //Retrieve detailed information about a recipe
-exports.getOne = async function(recipeId){
+exports.getRecipe = async function(recipeId){
     try {
         const connection = await db.getPool().getConnection();
 
@@ -107,48 +111,22 @@ exports.isValidRecipeId = async function(recipeId) {
 };
 
 
-//Retrieve a comment's children
-getChildren = async function(comment){
-    try {
-        const connection = await db.getPool().getConnection();
-        const sql = "SELECT * FROM Comment WHERE parent_comment_id = " + comment.comment_id;
-
-        const [children, _] = await connection.query(sql);
-        console.log(children);
-        if (children.length) {
-            let this_children = [];
-            let child;
-            for (child of children) {
-                this_children.push(getChildren(child));
-            }
-            connection.release();
-            return {comment: comment.comment_id, children: this_children};
-        } else {
-            connection.release();
-            return {comment: comment.comment_id};
-        }
-
-    } catch (err) {
-        console.log(err);
-        return -1;
-    }
-};
-
-
 //Retrieve a recipe's comments
 exports.getComments = async function(recipeId){
     try {
         const connection = await db.getPool().getConnection();
-        const sql = "SELECT * FROM Comment WHERE recipe_id = " + recipeId + " AND parent_comment_id IS NULL";
+        const sql = "WITH RECURSIVE cte AS ( " +
+            "SELECT comment_id, text, author_id, posted_date, CAST(comment_id AS CHAR(200)) AS path, 0 as depth " +
+            "FROM Comment " +
+            "WHERE recipe_id = 12 AND parent_comment_id IS NULL " +
+            "UNION ALL " +
+            "SELECT c.comment_id, c.text, c.author_id, c.posted_date, CONCAT(cte.path, \",\", c.comment_id), cte.depth+1 " +
+            "FROM Comment c JOIN cte " +
+            "ON cte.comment_id=c.parent_comment_id ) " +
+            "SELECT * FROM cte ORDER BY path;";
 
         const [results, _] = await connection.query(sql);
         connection.release();
-        let comment;
-        let tree;
-        for (comment of results) {
-            tree = await getChildren(comment);
-        }
-        // console.log(tree);
         return results;
     } catch (err) {
         console.log(err);
@@ -157,13 +135,12 @@ exports.getComments = async function(recipeId){
 };
 
 
-/*
-//Insert a new petition
-exports.insert = async function(petition_details){
+//Insert a new recipe
+exports.insert = async function(recipe_details){
     try {
         const connection = await db.getPool().getConnection();
-        const sql = "INSERT INTO Petition (title, description, author_id, category_id, created_date, closing_date) VALUES (?,?,?,?,?,?)";
-        let [result, _] = await connection.query(sql, petition_details);
+        const sql = "INSERT INTO Petition (title, description, yield, ready_in, ingredients, directions, author_id, category_id, posted_date) VALUES (?,?,?,?,?,?,?,?,?)";
+        let [result, _] = await connection.query(sql, recipe_details);
         connection.release();
         return result.insertId;
     } catch {
@@ -187,7 +164,7 @@ exports.categoryExists = async function(categoryId) {
     }
 };
 
-
+/*
 //Get all petition details associated with the id
 exports.getDetails = async function(id){
     try {

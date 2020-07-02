@@ -1,5 +1,5 @@
 const Recipe = require('../models/recipe.model');
-// const User = require('../models/user.model');
+const User = require('../models/user.model');
 // const fs = require('fs');
 // const photoDirectory = './storage/photos/';
 
@@ -8,10 +8,11 @@ exports.list = async function(req, res){
     try {
         let q = req.query.q;
         let categoryId = req.query.categoryId;
+        let authorId = req.query.authorId;
         let sortBy = req.query.sortBy;
         let startIndex = +req.query.startIndex;
         let count = +req.query.count;
-        const results = await Recipe.getRecipes(q, categoryId, sortBy);
+        const results = await Recipe.getRecipes(q, categoryId, authorId, sortBy);
         if (results === -1) {
             return res.sendStatus(500);
         } else {
@@ -56,7 +57,7 @@ exports.categories = async function(req, res){
 
 
 //Retrieve detailed information about a recipe
-exports.listInfo = async function(req, res) {
+exports.listDetails = async function(req, res) {
     try {
         let id = +req.params.id;
         const isValidId = await Recipe.isValidRecipeId(id);
@@ -64,7 +65,7 @@ exports.listInfo = async function(req, res) {
         if (!(isValidId)) {
             return res.sendStatus(404);
         } else {
-            const [recipeId, title, description, yield, readyIn, ingredients, directions, authorId, authorName, authorCity, authorCountry, category, postedDate, averageRating] = await Recipe.getOne(id);
+            const [recipeId, title, description, yield, readyIn, ingredients, directions, authorId, authorName, authorCity, authorCountry, category, postedDate, averageRating] = await Recipe.getRecipe(id);
             return res.status(200)
                 .send({recipeId: recipeId, title: title, description: description, yield: yield, readyIn: readyIn, ingredients: ingredients,
                     directions: directions, authorId: authorId, authorName: authorName, authorCity: authorCity, authorCountry: authorCountry,
@@ -100,8 +101,7 @@ exports.listComments = async function(req, res){
 };
 
 
-/*
-//Add a new petition
+//Add a new recipe
 exports.add = async function(req, res){
     try {
         let currToken = req.get('X-Authorization');
@@ -109,32 +109,38 @@ exports.add = async function(req, res){
         if (!(exists) || currToken === undefined) {
             return res.sendStatus(401);
         } else {
-            let petition_data = {
+            let recipe_data = {
                 "title": req.body.title,
                 "description": req.body.description,
-                "categoryId": req.body.categoryId,
-                "closingDate": req.body.closingDate
+                "yield": req.body.yield,
+                "readyIn": req.body.readyIn,
+                "ingredients": req.body.ingredients,
+                "directions": req.body.directions,
+                "categoryId": req.body.categoryId
             };
 
-            let title = petition_data['title'].toString();
-            let description = petition_data['description'].toString();
-            let categoryId = petition_data['categoryId'];
-            let closingDate = petition_data['closingDate'].toString();
+            let title = recipe_data['title'].toString();
+            let description = recipe_data['description'].toString();
+            let yield = recipe_data['yield'].toString();
+            let readyIn = recipe_data['readyIn'].toString();
+            let ingredients = recipe_data['ingredients'].toString();
+            let directions = recipe_data['directions'].toString();
+            let categoryId = recipe_data['categoryId'];
+            let postedDate = new Date();
 
-            const categoryExists = await Petition.categoryExists(categoryId);
-            let currDateTime = new Date();
+            const categoryExists = await Recipe.categoryExists(categoryId);
 
-            if (!(categoryExists) || (closingDate < currDateTime)) {
+            if (!(categoryExists)) {
                 return res.sendStatus(400);
             } else {
                 const authorId = await User.getId(currToken);
-                let petition_details = [title, description, authorId, categoryId, currDateTime, closingDate];
-                let insertId = await Petition.insert(petition_details);
+                let recipe_details = [title, description, yield, readyIn, ingredients, directions, authorId, categoryId, postedDate];
+                let insertId = await Recipe.insert(recipe_details);
                 if (insertId === -1) {
                     return res.sendStatus(400);
                 } else {
                     return res.status(201)
-                        .send({petitionId: insertId});
+                        .send({recipeId: insertId});
                 }
             }
         }
@@ -144,7 +150,7 @@ exports.add = async function(req, res){
     }
 };
 
-
+/*
 //Change a petition's details
 exports.changeInfo = async function(req, res){
     try {
